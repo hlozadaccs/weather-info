@@ -1,4 +1,6 @@
 import json
+import profile
+import time
 import os
 import time
 import urllib.parse
@@ -8,11 +10,14 @@ from decimal import Decimal
 import boto3
 import requests
 
-# DynamoDB
-dynamodb = boto3.resource("dynamodb")
-table = dynamodb.Table(os.environ["DYNAMODB_TABLE"])
-ssm = boto3.client("ssm")
 
+region_name = os.environ["REGION"]
+profile_name = os.environ["PROFILE_NAME"] if "PROFILE_NAME" in os.environ else None
+
+session = boto3.Session(profile_name=profile_name) if profile_name else boto3.Session()
+ssm = session.client("ssm", region_name=region_name)
+dynamodb = session.resource("dynamodb", region_name=region_name)
+table = dynamodb.Table(os.environ["DYNAMODB_TABLE"])
 
 # Env vars
 DYNAMODB_TTL_HOURS = int(os.environ.get("DYNAMODB_TTL_HOURS", "24"))
@@ -113,6 +118,7 @@ def lambda_handler(event, context):
     if event.get("requestContext", {}).get("http", {}).get("method") != "POST":
         return {
             "statusCode": 405,
+            "headers": {"Content-Type": "application/json"},
             "body": json.dumps({"error": "Método no permitido. Usa POST."}),
         }
 
@@ -122,18 +128,21 @@ def lambda_handler(event, context):
     except Exception:
         return {
             "statusCode": 400,
+            "headers": {"Content-Type": "application/json"},
             "body": json.dumps({"error": "Cuerpo inválido. Se esperaba JSON."}),
         }
 
     if not country_param:
         return {
             "statusCode": 400,
+            "headers": {"Content-Type": "application/json"},
             "body": json.dumps({"error": "El campo 'pais' es requerido en el body."}),
         }
 
     if is_throttled(ip):
         return {
             "statusCode": 429,
+            "headers": {"Content-Type": "application/json"},
             "body": json.dumps(
                 {"error": "Límite de peticiones excedido. Intenta más tarde."}
             ),
@@ -151,6 +160,7 @@ def lambda_handler(event, context):
     if not country_data or not weather_data:
         return {
             "statusCode": 502,
+            "headers": {"Content-Type": "application/json"},
             "body": json.dumps({"error": "Error al obtener datos externos."}),
         }
 

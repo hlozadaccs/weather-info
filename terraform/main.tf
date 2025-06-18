@@ -1,5 +1,3 @@
-# terraform/main.tf
-
 provider "aws" {
   region = var.aws_region
 }
@@ -64,7 +62,7 @@ resource "aws_iam_policy" "lambda_policy" {
 
 resource "aws_ssm_parameter" "owm_api_key" {
   name        = "/weather-info/openweathermap-api-key"
-  type        = "String"
+  type        = "SecureString"
   value       = var.owm_api_key
   overwrite   = true
   description = "API Key for OpenWeatherMap"
@@ -81,9 +79,9 @@ resource "aws_iam_role_policy_attachment" "lambda_policy_attach" {
 
 resource "aws_lambda_function" "weather_info" {
   function_name = "weather-info-lambda"
+  role          = aws_iam_role.lambda_exec_role.arn
   handler       = "handler.lambda_handler"
   runtime       = "python3.11"
-  role          = aws_iam_role.lambda_exec_role.arn
   timeout       = 30
   memory_size   = 256
 
@@ -92,6 +90,7 @@ resource "aws_lambda_function" "weather_info" {
 
   environment {
     variables = {
+      REGION               = var.aws_region
       DYNAMODB_TABLE       = aws_dynamodb_table.weather_info_table.name
       DYNAMODB_TTL_HOURS   = var.ttl_hours
     }
